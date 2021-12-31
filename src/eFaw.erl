@@ -119,8 +119,8 @@ syncWork(FName, RetTag, Timeout, Work) ->
          receive
             {RetTag, Ret} ->
                Ret
-            after Timeout ->
-               timeout
+         after Timeout ->
+            timeout
          end;
       FTaskLen < WFCnt ->
          %% See if need to wake up idle workers

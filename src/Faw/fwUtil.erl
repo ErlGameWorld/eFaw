@@ -58,7 +58,7 @@ tryWorkOnce(#wParam{fName = FName, fNameTid = FNameTid, mod = Mod, fTpm = FTpm, 
                NewState
          catch
             C:R:S ->
-               ?FwErr("woker do task error ~p ~p ~p ~p ~p ~n", [FName, Mod, IsTmp, self(), {C:R:S}]),
+               ?FwErr("woker do task error ~p ~p ~p ~p ~p ~n", [FName, Mod, IsTmp, self(), {C, R, S}]),
                State
          end
    end.
@@ -97,7 +97,7 @@ tryWorkLoop(#wParam{fName = FName, fNameTid = FNameTid, mod = Mod, fTpm = FTpm, 
                   TemState
             catch
                C:R:S ->
-                  ?FwErr("woker do task error ~p ~p ~p ~p ~p ~n", [FName, Mod, IsTmp, self(), {C:R:S}]),
+                  ?FwErr("woker do task error ~p ~p ~p ~p ~p ~n", [FName, Mod, IsTmp, self(), {C, R, S}]),
                   State
             end,
          tryWorkLoop(WParam, NewState)

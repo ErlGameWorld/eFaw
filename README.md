@@ -10,6 +10,7 @@ Build
 
 Useage
 ------
+
     1 write you worker mod like: fwWtp.erl 
     2 open your factory        : eFaw:openF(myFactory, [{wMod, fwWtp}, ...]), more option see eFaw.hrl
     3 send your async task to your factory: eFaw:inWork(myFactory, [{report_log, xxxx}, {write_log, yyyyyy}]).
