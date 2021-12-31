@@ -20,42 +20,52 @@ new(Name) ->
          name_used
    end.
 
--spec del(Name :: atom()) -> ok.
+-spec del(Name :: atom() | ets:tid()) -> ok.
 del(Name) ->
    ets:delete(Name).
 
--spec in(Name :: atom(), Value :: term()) -> true.
+-spec in(Name :: atom() | ets:tid(), Value :: term()) -> true.
 in(Name, Value) ->
    ets:insert(Name, {erlang:unique_integer(), Value}).
 
--spec ins(Name :: atom(), Values :: [term()]) -> true.
+-spec ins(Name :: atom() | ets:tid(), Values :: [term()]) -> true.
 ins(Name, Values) ->
    Tasks = [{erlang:unique_integer(), Value} || Value <- Values],
    ets:insert(Name, Tasks),
    true.
 
--spec out(Name :: atom()) -> empty | Value :: term().
+-spec outF(Name :: atom() | ets:tid()) -> empty | Value :: term().
 outF(Name) ->
-   case ets:first_take(Name) of
-      [] ->
+   case ets:first(Name) of
+      '$end_of_table' ->
          empty;
-      [{_, Value}] ->
-         Value
+      Key ->
+         case ets:take(Name, Key) of
+            [] ->
+               outF(Name);
+            [{_, Value}] ->
+               Value
+         end
    end.
 
--spec out(Name :: atom()) -> empty | Value :: term().
+-spec outL(Name :: atom() | ets:tid()) -> empty | Value :: term().
 outL(Name) ->
-   case ets:last_take(Name) of
-      [] ->
+   case ets:last(Name) of
+      '$end_of_table' ->
          empty;
-      [{_, Value}] ->
-         Value
+      Key ->
+         case ets:take(Name, Key) of
+            [] ->
+               outL(Name);
+            [{_, Value}] ->
+               Value
+         end
    end.
 
--spec clear(Name :: atom()) -> ok.
+-spec clear(Name :: atom() | ets:tid()) -> ok.
 clear(Name) ->
    ets:delete_all_objects(Name).
 
--spec size(Name :: atom()) -> Size :: integer() | undefined.
+-spec size(Name :: atom() | ets:tid()) -> Size :: integer() | undefined.
 size(Name) ->
    ets:info(Name, size).

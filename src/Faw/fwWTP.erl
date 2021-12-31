@@ -17,6 +17,7 @@
 
 -export([
    init/1
+   , handleAfter/2
    , handleCall/3
    , handleCast/2
    , handleInfo/2
@@ -25,32 +26,37 @@
 ]).
 
 -define(SERVER, ?MODULE).
--record(state, {fName :: ets:tid(), isTmp = false :: boolean()}).
+-record(state, {wParam}).
 
 %% ********************************************  API *******************************************************************
 start_link(FName, IsTmp) ->
-   gen_srv:start_link({local, ?SERVER}, ?MODULE, [FName, IsTmp], []).
+   gen_srv:start_link(?MODULE, [FName, IsTmp], []).
 
 %% ********************************************  callback **************************************************************
 init([FName, IsTmp]) ->
    erlang:process_flag(trap_exit, true),
-   {ok, #state{fName = FName, isTmp = IsTmp}}.
+   {ok, #state{wParam = fwUtil:initWParam(FName, IsTmp)}, {doAfter, 0}}.
+
+handleAfter(0, #state{wParam = WParam} = State) ->
+   %fwUtil:tryWorkOnce(WParam, State);
+   NewState = fwUtil:tryWorkLoop(WParam, State),
+   {noreply, NewState}.
 
 handleCall(_Msg, _State, _FROM) ->
-   ?ERR("~p call receive unexpect msg ~p ~n ", [?MODULE, _Msg]),
+   ?FwErr("~p call receive unexpect msg ~p ~n ", [?MODULE, _Msg]),
    {reply, ok}.
 
 %% 默认匹配
 handleCast(_Msg, _State) ->
-   ?ERR("~p cast receive unexpect msg ~p ~n ", [?MODULE, _Msg]),
+   ?FwErr("~p cast receive unexpect msg ~p ~n ", [?MODULE, _Msg]),
    kpS.
 
-handleInfo(tryWork, _State) ->
-   %fwUtil:tryWorkLoop(xxxxxxxx);
-   NewState = fwUtil:tryWorkOnce(),
+handleInfo(mTryWork, #state{wParam = WParam} = State) ->
+   %fwUtil:tryWorkOnce(WParam, State);
+   NewState = fwUtil:tryWorkLoop(WParam, State),
    {noreply, NewState};
 handleInfo(_Msg, _State) ->
-   ?ERR("~p info receive unexpect msg ~p ~n ", [?MODULE, _Msg]),
+   ?FwErr("~p info receive unexpect msg ~p ~n ", [?MODULE, _Msg]),
    kpS.
 
 terminate(_Reason, _State) ->
@@ -61,9 +67,11 @@ code_change(_OldVsn, State, _Extra) ->
 
 work(task1, State) ->
    State;
-work(task1, State) ->
+work(task2, State) ->
    State;
 work(_Task, State) ->
+   timer:sleep(1),
+   %io:format("~p ~n",[self()]),
    State.
 
 idle(State) ->

@@ -1,20 +1,57 @@
 -module(fwUtil).
 
+-include("eFaw.hrl").
+
 -export([
-   tryWorkOnce/4
-   , tryWorkLoop/4
+   initCfg/1
+   , initWParam/2
+   , tryWorkOnce/2
+   , tryWorkLoop/2
 ]).
 
-tryWorkOnce(FName, Mod, WStrategy, State) ->
-   case WStrategy of
+initCfg(Kvs) ->
+   [
+      begin
+         case lists:keyfind(Key, 1, Kvs) of
+            false ->
+               {Key, DefV};
+            Tuple ->
+               Tuple
+         end
+      end
+      || {Key, DefV} <- ?FawDefV
+   ].
+
+initWParam(FName, IsTmp) ->
+   #wParam{fName = FName, fNameTid = ets:whereis(FName), mod = FName:getV(?wMod), fTpm = FName:getV(?fTpm), isTmp = IsTmp}.
+
+tryWorkOnce(#wParam{fName = FName, fNameTid = FNameTid, mod = Mod, fTpm = FTpm, isTmp = IsTmp}, State) ->
+   case FTpm of
       fifo ->
-         Task = fwQueue:outF(FName);
+         Task = fwQueue:outF(FNameTid);
       _ ->
-         Task = fwQueue:outL(FName)
+         Task = fwQueue:outL(FNameTid)
    end,
    case Task of
       empty ->
-         Mod:idle(State);
+         case IsTmp of
+            false ->
+               fwFMgr:wSleep(FName, self()),
+               case erlang:function_exported(Mod, idle, 1) of
+                  true ->
+                     Mod:idle(State);
+                  _ ->
+                     State
+               end;
+            _ ->
+               fwFMgr:tWOver(FName, self()),
+               case erlang:function_exported(Mod, close, 1) of
+                  true ->
+                     Mod:close(State);
+                  _ ->
+                     State
+               end
+         end;
       _ ->
          try Mod:work(Task, State) of
             NewState ->
@@ -24,16 +61,33 @@ tryWorkOnce(FName, Mod, WStrategy, State) ->
          end
    end.
 
-tryWorkLoop(FName, Mod, WStrategy, State) ->
-   case WStrategy of
+tryWorkLoop(#wParam{fName = FName, fNameTid = FNameTid, mod = Mod, fTpm = FTpm, isTmp = IsTmp} = WParam, State) ->
+   case FTpm of
       fifo ->
-         Task = fwQueue:outF(FName);
+         Task = fwQueue:outF(FNameTid);
       _ ->
-         Task = fwQueue:outL(FName)
+         Task = fwQueue:outL(FNameTid)
    end,
    case Task of
       empty ->
-         Mod:idle(State);
+         case IsTmp of
+            false ->
+               fwFMgr:wSleep(FName, self()),
+               case erlang:function_exported(Mod, idle, 1) of
+                  true ->
+                     Mod:idle(State);
+                  _ ->
+                     State
+               end;
+            _ ->
+               fwFMgr:tWOver(FName, self()),
+               case erlang:function_exported(Mod, close, 1) of
+                  true ->
+                     Mod:close(State);
+                  _ ->
+                     State
+               end
+         end;
       _ ->
          NewState =
             try Mod:work(Task, State) of
@@ -42,5 +96,5 @@ tryWorkLoop(FName, Mod, WStrategy, State) ->
             catch
                _C:_R:_S -> State
             end,
-         tryWorkLoop(FName, Mod, WStrategy, NewState)
+         tryWorkLoop(WParam, NewState)
    end.

@@ -19,45 +19,46 @@ start() ->
 stop() ->
    application:stop(eFaw).
 
-initCfg(Kvs) ->
-   [
-      begin
-         case lists:keyfind(Key, 1, Kvs) of
-            false ->
-               {Key, DefV};
-            Tuple ->
-               Tuple
-         end
-      end
-      || {Key, DefV} <- ?FawDefV
-   ].
-
-
 openF(FName, Kvs) ->
+   fwKvsToBeam:load(FName, fwUtil:initCfg(Kvs)),
    FChildSpec = #{
       id => FName,
-      start => {fwWSup, start_link, [FName]},
+      start => {fwWSup, start_link, [FName, FName:getV(?wMod)]},
       restart => permanent,
       shutdown => 300000,
       type => supervisor,
       modules => [fwWSup]
    },
-   Ret = supervisor:start_child(eFaw_sup, FChildSpec),
-   fwKvsToBeam:load(FName, initCfg(Kvs)),
-   hireW(FName:getV(?wFCnt), FName, false),
-   Ret.
+   case supervisor:start_child(eFaw_sup, FChildSpec) of
+      {ok, _Pid} = Ret ->
+         io:format("IMY************** ~p~n", [Ret]),
+         fwFMgr:newQueue(FName),
+         hireW(FName:getV(?wFCnt), FName, false),
+         Ret;
+      ErrRet ->
+         ?FwErr("open factory error ~p~n", [ErrRet]),
+         ErrRet
+   end.
 
 hireW(WorkerNum, FName, IsTmp) when is_integer(WorkerNum), WorkerNum > 0 ->
-   supervisor:start_child(FName, [IsTmp]),
+   case supervisor:start_child(FName, [IsTmp]) of
+      {ok, _Pid} ->
+         ignore;
+      ErrRet ->
+         ?FwErr("hire worker error ~p~n", [ErrRet])
+   end,
    hireW(WorkerNum - 1, FName, IsTmp);
 hireW(_WorkerNum, _FName, _IsTmp) ->
    ok.
 
 closeF(FName) ->
-   supervisor:terminate_child(eFaw_sup, FName).
+   supervisor:terminate_child(eFaw_sup, FName),
+   supervisor:delete_child(eFaw_sup, FName),
+   fwFMgr:delQueue(FName).
 
 -spec inWork(FName :: atom(), Work :: term()) -> true | false.
 inWork(FName, Work) ->
+   % fwQueue:in(FName, Work).
    FTaskLen = fwQueue:size(FName),
    FTMax = FName:getV(?fTMax),
    FTLfl = FName:getV(?fTLfl),
@@ -68,11 +69,12 @@ inWork(FName, Work) ->
          false;
       FTaskLen == FTLfl ->
          %% See factory if need to hire hourly worker
-         gen_srv:send(fwFMgr, mChAddW),
+         %io:format("IMY*****************try addddddddd~n"),
+         fwFMgr:chAddW(FName),
          fwQueue:in(FName, Work);
       FTaskLen < WFCnt ->
          %% See if need to wake up idle workers
-         gen_srv:send(fwFMgr, mChAwkW),
+         fwFMgr:chAwkW(FName),
          fwQueue:in(FName, Work);
       true ->
          fwQueue:in(FName, Work)
@@ -90,17 +92,17 @@ inWorks(FName, Works) ->
          false;
       FTaskLen == FTLfl ->
          %% See factory if need to hire hourly worker
-         gen_srv:send(fwFMgr, mChAddW),
+         fwFMgr:chAddW(FName),
          fwQueue:ins(FName, Works);
       FTaskLen < WFCnt ->
          %% See if need to wake up idle workers
-         gen_srv:send(fwFMgr, mChAwkW),
+         fwFMgr:chAwkW(FName),
          fwQueue:ins(FName, Works);
       true ->
          fwQueue:ins(FName, Works)
    end.
 
--spec syncWork(FName :: atom(), Work :: term()) -> true | false.
+-spec syncWork(FName :: atom(), RetTag :: atom(), Timeout :: pos_integer() | infinity, Work :: term()) -> true | false.
 syncWork(FName, RetTag, Timeout, Work) ->
    FTaskLen = fwQueue:size(FName),
    FTMax = FName:getV(?fTMax),
@@ -112,7 +114,7 @@ syncWork(FName, RetTag, Timeout, Work) ->
          false;
       FTaskLen == FTLfl ->
          %% See factory if need to hire hourly worker
-         gen_srv:send(fwFMgr, mChAddW),
+         fwFMgr:chAddW(FName),
          fwQueue:in(FName, Work),
          receive
             {RetTag, Ret} ->
@@ -122,7 +124,7 @@ syncWork(FName, RetTag, Timeout, Work) ->
          end;
       FTaskLen < WFCnt ->
          %% See if need to wake up idle workers
-         gen_srv:send(fwFMgr, mChAwkW),
+         fwFMgr:chAwkW(FName),
          fwQueue:in(FName, Work),
          receive
             {RetTag, Ret} ->

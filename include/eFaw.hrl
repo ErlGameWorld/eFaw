@@ -1,24 +1,24 @@
--define(wMod, wMod).          %% 工人任务处理模块
--define(wFCnt, wFCnt).        %% 固定工人人数
--define(wTCnt, wTCnt).        %% 可以聘请的零时工数量
--define(wTLive, wTLive).      %% 零时工最大空闲时间单位(s) 空闲超时之后就解雇
--define(fTpm, fTpm).          %% 工厂任务处理模式 fifo lifo
--define(fTLfl, fTLfl).        %% 工厂任务承载线 超过该值就可以聘请零时工了 0 固定工人数 工厂负载超过该值时增加零时工
--define(fTMax, fTMax).        %% 工厂最大负载量 超过该值时 工厂就不再接受任务了
+-define(wMod, wMod).          %% worker Mod
+-define(wFCnt, wFCnt).        %% worker fixed count
+-define(wTCnt, wTCnt).        %% worker temp count
+-define(fTpm, fTpm).          %% Factory task processing mode fifo lifo
+-define(fTLfl, fTLfl).        %% Factory task load line When the factory load exceeds this value, temp workers can be hired
+-define(fTMax, fTMax).        %% Maximum plant load Beyond this value, the factory will no longer accept tasks
 
--type fawOtp() :: {?wMod, atom()} |{?wFCnt, pos_integer()} |{?wTCnt, pos_integer()} |{?wTLive, pos_integer()} |{?fTpm, fifo | lifo} |{?fTLfl, pos_integer()} | {?fTMax, pos_integer()}.
+-type fawOtp() :: {?wMod, atom()} |{?wFCnt, pos_integer()} |{?wTCnt, pos_integer()} |{?fTpm, fifo | lifo} |{?fTLfl, pos_integer() | infinity} | {?fTMax, pos_integer() | infinity}.
 
 -define(FawDefV, [
-   , {?wMod, fwWTP}
+   {?wMod, fwWTP}
    , {?wFCnt, 30}
    , {?wTCnt, 20}
-   , {?wTLive, 300}
    , {?fTpm, fifo}
    , {?fTLfl, 10000}
-   , {?fTMax, 10000}
-   ]).
+   , {?fTMax, infinity}
+]).
 
 -type fawOtps() :: [fawOtp(), ...].
 
--define(ERR(Format, Args), error_logger:error_msg(Format, Args)).
+-record(wParam, {fName :: atom(), fNameTid :: ets:tid(), mod :: atom(), fTpm = fifo :: fifo | lifo, isTmp = false :: boolean()}).
+
+-define(FwErr(Format, Args), error_logger:error_msg(Format, Args)).
 
