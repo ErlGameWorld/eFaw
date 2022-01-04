@@ -15,7 +15,7 @@
 new(Name) ->
    case ets:info(Name, id) of
       undefined ->
-         ets:new(Name, [ordered_set, public, named_table, {write_concurrency, true}]);
+         ets:new(Name, [ordered_set, public, named_table, {write_concurrency, true}, {decentralized_counters, false}]);
       _ ->
          name_used
    end.
