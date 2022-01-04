@@ -70,12 +70,14 @@ inWork(FName, Work) ->
       FTaskLen == FTLfl ->
          %% See factory if need to hire hourly worker
          %io:format("IMY*****************try addddddddd~n"),
+         fwQueue:in(FName, Work),
          fwFMgr:chAddW(FName),
-         fwQueue:in(FName, Work);
+         true;
       FTaskLen < WFCnt ->
          %% See if need to wake up idle workers
+         fwQueue:in(FName, Work),
          fwFMgr:chAwkW(FName),
-         fwQueue:in(FName, Work);
+         true;
       true ->
          fwQueue:in(FName, Work)
    end.
@@ -92,12 +94,14 @@ inWorks(FName, Works) ->
          false;
       FTaskLen == FTLfl ->
          %% See factory if need to hire hourly worker
+         fwQueue:ins(FName, Works),
          fwFMgr:chAddW(FName),
-         fwQueue:ins(FName, Works);
+         true;
       FTaskLen < WFCnt ->
          %% See if need to wake up idle workers
+         fwQueue:ins(FName, Works),
          fwFMgr:chAwkW(FName),
-         fwQueue:ins(FName, Works);
+         true;
       true ->
          fwQueue:ins(FName, Works)
    end.
@@ -114,8 +118,8 @@ syncWork(FName, RetTag, Timeout, Work) ->
          false;
       FTaskLen == FTLfl ->
          %% See factory if need to hire hourly worker
-         fwFMgr:chAddW(FName),
          fwQueue:in(FName, Work),
+         fwFMgr:chAddW(FName),
          receive
             {RetTag, Ret} ->
                Ret
@@ -124,8 +128,8 @@ syncWork(FName, RetTag, Timeout, Work) ->
          end;
       FTaskLen < WFCnt ->
          %% See if need to wake up idle workers
-         fwFMgr:chAwkW(FName),
          fwQueue:in(FName, Work),
+         fwFMgr:chAwkW(FName),
          receive
             {RetTag, Ret} ->
                Ret
