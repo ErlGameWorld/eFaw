@@ -7,6 +7,7 @@
    , stop/0                %% stop app
    , openF/2               %% Open a factory
    , closeF/1              %% close a factory
+   , sizeF/1               %% size a factory
    , hireW/3               %% hire worker
    , inWork/2              %% Insert async task
    , inWorks/2             %% Insert async tasks
@@ -25,13 +26,12 @@ openF(FName, Kvs) ->
       id => FName,
       start => {fwWSup, start_link, [FName, FName:getV(?wMod)]},
       restart => permanent,
-      shutdown => 300000,
+      shutdown => infinity,
       type => supervisor,
       modules => [fwWSup]
    },
    case supervisor:start_child(eFaw_sup, FChildSpec) of
       {ok, _Pid} = Ret ->
-         io:format("IMY************** ~p~n", [Ret]),
          fwFMgr:newQueue(FName),
          hireW(FName:getV(?wFCnt), FName, false),
          Ret;
@@ -56,35 +56,48 @@ closeF(FName) ->
    supervisor:delete_child(eFaw_sup, FName),
    fwFMgr:delQueue(FName).
 
+sizeF(FName) ->
+   QRef = persistent_term:get(FName),
+   eLfq:size(QRef).
+
 -spec inWork(FName :: atom(), Work :: term()) -> true | false.
 inWork(FName, Work) ->
-   % fwQueue:in(FName, Work).
-   FTaskLen = fwQueue:size(FName),
+   QRef = persistent_term:get(FName),
+   FTaskLen = eLfq:size(QRef),
    FTMax = FName:getV(?fTMax),
    FTLfl = FName:getV(?fTLfl),
    WFCnt = FName:getV(?wFCnt),
+
    if
       FTaskLen > FTMax ->
          %% The factory is overloaded
          false;
       FTaskLen == FTLfl ->
          %% See factory if need to hire hourly worker
-         %io:format("IMY*****************try addddddddd~n"),
-         fwQueue:in(FName, Work),
-         fwFMgr:chAddW(FName),
-         true;
+         case eLfq:in(QRef, Work) of
+            true ->
+               fwFMgr:chAddW(FName),
+               true;
+            _ ->
+               false
+         end;
       FTaskLen < WFCnt ->
          %% See if need to wake up idle workers
-         fwQueue:in(FName, Work),
-         fwFMgr:chAwkW(FName),
-         true;
+         case eLfq:in(QRef, Work) of
+            true ->
+               fwFMgr:chAwkW(FName),
+               true;
+            _ ->
+               false
+         end;
       true ->
-         fwQueue:in(FName, Work)
+         eLfq:in(QRef, Work)
    end.
 
 -spec inWorks(FName :: atom(), Works :: [term(), ...]) -> true | false.
 inWorks(FName, Works) ->
-   FTaskLen = fwQueue:size(FName),
+   QRef = persistent_term:get(FName),
+   FTaskLen = eLfq:size(QRef),
    FTMax = FName:getV(?fTMax),
    FTLfl = FName:getV(?fTLfl),
    WFCnt = FName:getV(?wFCnt),
@@ -94,21 +107,29 @@ inWorks(FName, Works) ->
          false;
       FTaskLen == FTLfl ->
          %% See factory if need to hire hourly worker
-         fwQueue:ins(FName, Works),
-         fwFMgr:chAddW(FName),
-         true;
+         case eLfq:ins(QRef, Works) of
+            true ->
+               fwFMgr:chAddW(FName),
+               true;
+            _ ->
+               false
+         end;
       FTaskLen < WFCnt ->
          %% See if need to wake up idle workers
-         fwQueue:ins(FName, Works),
-         fwFMgr:chAwkW(FName),
-         true;
+         case eLfq:ins(QRef, Works) of
+            true ->
+               fwFMgr:chAwkW(FName);
+            _ ->
+               false
+         end;
       true ->
-         fwQueue:ins(FName, Works)
+         eLfq:ins(QRef, Works)
    end.
 
 -spec syncWork(FName :: atom(), RetTag :: atom(), Timeout :: pos_integer() | infinity, Work :: term()) -> true | false.
 syncWork(FName, RetTag, Timeout, Work) ->
-   FTaskLen = fwQueue:size(FName),
+   QRef = persistent_term:get(FName),
+   FTaskLen = eLfq:size(QRef),
    FTMax = FName:getV(?fTMax),
    FTLfl = FName:getV(?fTLfl),
    WFCnt = FName:getV(?wFCnt),
@@ -118,31 +139,44 @@ syncWork(FName, RetTag, Timeout, Work) ->
          false;
       FTaskLen == FTLfl ->
          %% See factory if need to hire hourly worker
-         fwQueue:in(FName, Work),
-         fwFMgr:chAddW(FName),
-         receive
-            {RetTag, Ret} ->
-               Ret
-         after Timeout ->
-            timeout
+         case eLfq:in(QRef, Work) of
+            true ->
+               fwFMgr:chAddW(FName),
+               receive
+                  {RetTag, Ret} ->
+                     Ret
+               after Timeout ->
+                  timeout
+               end;
+            _ ->
+               false
          end;
       FTaskLen < WFCnt ->
          %% See if need to wake up idle workers
-         fwQueue:in(FName, Work),
-         fwFMgr:chAwkW(FName),
-         receive
-            {RetTag, Ret} ->
-               Ret
-         after Timeout ->
-            timeout
+         case eLfq:in(QRef, Work) of
+            true ->
+
+               fwFMgr:chAwkW(FName),
+               receive
+                  {RetTag, Ret} ->
+                     Ret
+               after Timeout ->
+                  timeout
+               end;
+            _ ->
+               false
          end;
       true ->
-         fwQueue:in(FName, Work),
-         receive
-            {RetTag, Ret} ->
-               Ret
-         after Timeout ->
-            timeout
+         case eLfq:in(QRef, Work) of
+            true ->
+               receive
+                  {RetTag, Ret} ->
+                     Ret
+               after Timeout ->
+                  timeout
+               end;
+            _ ->
+               false
          end
    end.
 

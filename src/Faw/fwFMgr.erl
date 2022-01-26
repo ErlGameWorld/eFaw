@@ -59,11 +59,19 @@ init(_Args) ->
    {ok, #{}}.
 
 handleCall({mNewQueue, FName}, _State, _FROM) ->
-   Ret = fwQueue:new(FName),
-   {reply, Ret};
-handleCall({mDelQueue, FName}, _State, _FROM) ->
-   Ret = fwQueue:del(FName),
-   {reply, Ret};
+   {ok, QRef} = eLfq:new(),
+   persistent_term:put(FName, QRef),
+   {reply, ok};
+handleCall({mDelQueue, FName}, State, _FROM) ->
+   NewState =
+      case persistent_term:get(FName, undefined) of
+      undefined ->
+         State;
+      QRef ->
+         eLfq:del(QRef),
+         maps:remove(FName, State)
+   end,
+   {reply, ok, NewState};
 handleCall(_Msg, _State, _FROM) ->
    ?FwErr("~p call receive unexpect msg ~p ~n ", [?MODULE, _Msg]),
    {reply, ok}.
@@ -83,7 +91,6 @@ handleInfo({mChAddW, FName}, _State) ->
          AddCnt = WTCnt + WFCnt - WorkerCnt,
          case AddCnt > 0 of
             true ->
-               %io:format("IMY*****************addddddddd ~p~n", [AddCnt]),
                eFaw:hireW(AddCnt, FName, true);
             _ ->
                ignore
@@ -107,8 +114,10 @@ handleInfo({mChAwkW, FName}, State) ->
                      handleInfo({mChAwkW, FName}, NewState)
                end;
             _ ->
-               {noreply, State}
-         end
+               kpS
+         end;
+      _ ->
+         kpS
    end;
 handleInfo(mTickCheck, State) ->
    NewState = tickCheck(State),
@@ -128,9 +137,9 @@ handleInfo({mWSleep, FName, Pid}, State) ->
             State#{FName => [Pid]}
       end,
    {noreply, NewState};
-handleInfo({mTWOver, FName, Pid}, State) ->
+handleInfo({mTWOver, FName, Pid}, _State) ->
    supervisor:terminate_child(FName, Pid),
-   {noreply, State};
+   kpS;
 handleInfo(_Msg, _State) ->
    ?FwErr("~p info receive unexpect msg ~p ~n ", [?MODULE, _Msg]),
    kpS.
@@ -147,7 +156,8 @@ tickCheck(State) ->
 tickCheck(Iterator, State) ->
    case maps:next(Iterator) of
       {FName, IdleList, NextIter} ->
-         TaskLen = fwQueue:size(FName),
+         QRef = persistent_term:get(FName),
+         TaskLen = eLfq:size(QRef),
          WFCnt = FName:getV(?wFCnt),
          IdleCnt = length(IdleList),
 

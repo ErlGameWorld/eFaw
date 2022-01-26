@@ -23,17 +23,12 @@ initCfg(Kvs) ->
    ].
 
 initWParam(FName, IsTmp) ->
-   #wParam{fName = FName, fNameTid = ets:whereis(FName), mod = FName:getV(?wMod), fTpm = FName:getV(?fTpm), isTmp = IsTmp}.
+   #wParam{fName = FName, fNameTid = persistent_term:get(FName), mod = FName:getV(?wMod), isTmp = IsTmp}.
 
-tryWorkOnce(#wParam{fName = FName, fNameTid = FNameTid, mod = Mod, fTpm = FTpm, isTmp = IsTmp}, State) ->
-   case FTpm of
-      fifo ->
-         Task = fwQueue:outF(FNameTid);
-      _ ->
-         Task = fwQueue:outL(FNameTid)
-   end,
+tryWorkOnce(#wParam{fName = FName, fNameTid = FNameTid, mod = Mod, isTmp = IsTmp}, State) ->
+   Task = eLfq:tryOut(FNameTid),
    case Task of
-      empty ->
+      lfq_empty ->
          case IsTmp of
             false ->
                fwFMgr:wSleep(FName, self()),
@@ -63,15 +58,10 @@ tryWorkOnce(#wParam{fName = FName, fNameTid = FNameTid, mod = Mod, fTpm = FTpm, 
          end
    end.
 
-tryWorkLoop(#wParam{fName = FName, fNameTid = FNameTid, mod = Mod, fTpm = FTpm, isTmp = IsTmp} = WParam, State) ->
-   case FTpm of
-      fifo ->
-         Task = fwQueue:outF(FNameTid);
-      _ ->
-         Task = fwQueue:outL(FNameTid)
-   end,
+tryWorkLoop(#wParam{fName = FName, fNameTid = FNameTid, mod = Mod, isTmp = IsTmp} = WParam, State) ->
+   Task = eLfq:tryOut(FNameTid),
    case Task of
-      empty ->
+      lfq_empty ->
          case IsTmp of
             false ->
                fwFMgr:wSleep(FName, self()),

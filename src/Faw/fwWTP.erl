@@ -71,7 +71,7 @@ work(task2, State) ->
    State;
 work(_Task, State) ->
    timer:sleep(1),
-   %io:format("~p ~n",[self()]),
+   % io:format("work out ~p ~p ~n",[self(), _Task]),
    State.
 
 idle(State) ->
