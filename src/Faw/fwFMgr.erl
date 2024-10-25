@@ -114,10 +114,10 @@ handleInfo({mChAwkW, FName}, State) ->
                      handleInfo({mChAwkW, FName}, NewState)
                end;
             _ ->
-               kpS
+               {noreply, State}
          end;
       _ ->
-         kpS
+         {noreply, State}
    end;
 handleInfo(mTickCheck, State) ->
    NewState = tickCheck(State),
