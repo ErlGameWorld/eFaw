@@ -40,9 +40,9 @@ init([FName, IsTmp]) ->
 			{ok, #state{wParam = fwUtil:initWParam(FName, IsTmp)}}
 	end.
 
-handleAfter(0, #state{wParam = WParam} = State) ->
-	NewState = fwUtil:tryWorkLoop(WParam, State),
-	{noreply, NewState}.
+handleAfter(0, #state{wParam = WParam}) ->
+	fwUtil:tryWorkLoop(WParam),
+	kpS.
 
 handleCall({mDoWork, Work}, #state{wParam = #wParam{fName = FName, mod = Mod, isTmp = IsTmp}} = _State, FROM) ->
 	try Mod:work(Work) of
@@ -102,10 +102,12 @@ code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
 work(task1) ->
-	task1;
+	io:format("IMY*****************do work ~p~n", [task1]),
+	dotask1;
 work(task2) ->
-	task2;
+	io:format("IMY***************** do work ~p~n", [task1]),
+	dotask2;
 work(_Task) ->
 	timer:sleep(1),
-	% io:format("work out ~p ~p ~n",[self(), _Task]),
-	_Task.
+	io:format("IMY***************** do work ~p ~p ~n",[self(), _Task]),
+	{do, _Task}.

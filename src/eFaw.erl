@@ -51,17 +51,17 @@ openW(WName, Kvs) ->
 	},
 	case supervisor:start_child(eFaw_sup, FChildSpec) of
 		{ok, _Pid} = Ret ->
-			NameList = [{Idx, workerName(Idx)} || Idx <- lists:seq(1, WFCnt)],
+			NameList = [{Idx, wWorkerName(WName, Idx)} || Idx <- lists:seq(1, WFCnt)],
 			[supervisor:start_child(WName, [WorkName, worker]) || {_Idx, WorkName} <- NameList],
-			fwKvsToBeam:load(WName, [CfgKvs | NameList]),
+			fwKvsToBeam:load(WName, CfgKvs ++ NameList),
 			Ret;
 		ErrRet ->
-			?FwErr("open factory error ~p~n", [ErrRet]),
+			?FwErr("open worker error ~p~n", [ErrRet]),
 			ErrRet
 	end.
 
-workerName(Idx) ->
-	binary_to_atom(<<"$fawWork_", (integer_to_binary(Idx))/binary>>).
+wWorkerName(WName, Idx) ->
+	binary_to_atom(<<"$wWork_", (atom_to_binary(WName))/binary, (integer_to_binary(Idx))/binary>>).
 
 closeW(WName) ->
 	supervisor:terminate_child(eFaw_sup, WName),
@@ -137,7 +137,7 @@ openF(FName, Kvs) ->
 		_ ->
 			ignore
 	end,
-	
+
 	FChildSpec = #{
 		id => FName,
 		start => {fwWSup, start_link, [FName, FName:getV(?wMod)]},
@@ -157,7 +157,8 @@ openF(FName, Kvs) ->
 	end.
 
 hireW(WorkerNum, FName, IsTmp) when is_integer(WorkerNum), WorkerNum > 0 ->
-	case supervisor:start_child(FName, [IsTmp]) of
+	FWorkerName = fWorkerName(FName, WorkerNum),
+	case supervisor:start_child(FName, [FWorkerName, IsTmp]) of
 		{ok, _Pid} ->
 			ignore;
 		ErrRet ->
@@ -166,6 +167,9 @@ hireW(WorkerNum, FName, IsTmp) when is_integer(WorkerNum), WorkerNum > 0 ->
 	hireW(WorkerNum - 1, FName, IsTmp);
 hireW(_WorkerNum, _FName, _IsTmp) ->
 	ok.
+
+fWorkerName(FName, Idx) ->
+	binary_to_atom(<<"$fWork_", (atom_to_binary(FName))/binary, (integer_to_binary(Idx))/binary>>).
 
 closeF(FName) ->
 	supervisor:terminate_child(eFaw_sup, FName),
@@ -183,7 +187,7 @@ inWork(FName, Work) ->
 	FTMax = FName:getV(?fTMax),
 	FTLfl = FName:getV(?fTLfl),
 	WFCnt = FName:getV(?wFCnt),
-	
+
 	if
 		FTaskLen > FTMax ->
 			%% The factory is overloaded

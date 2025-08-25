@@ -22,7 +22,7 @@ initCfg(Kvs) ->
    ].
 
 initWParam(FName, IsTmp) ->
-   #wParam{fName = FName, fNameTid = persistent_term:get(FName), mod = FName:getV(?wMod), isTmp = IsTmp}.
+   #wParam{fName = FName, fNameTid = ?IIF(is_boolean(IsTmp), persistent_term:get(FName), undefined), mod = FName:getV(?wMod), isTmp = IsTmp}.
 
 tryWorkLoop(#wParam{fName = FName, fNameTid = FNameTid, mod = Mod, isTmp = IsTmp} = WParam) ->
    Task = eLfq:tryOut(FNameTid),
