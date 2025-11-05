@@ -3,7 +3,7 @@
       {vsn, "0.1.0"},
       {registered, []},
       {mod, {eFaw_app, []}},
-      {applications, [kernel, stdlib, eSync]},
+      {applications, [kernel, stdlib]},
       {env, []},
       {modules, []},
 

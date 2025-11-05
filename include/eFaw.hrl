@@ -4,7 +4,7 @@
 -define(fTLfl, fTLfl).        %% Factory task load line When the factory load exceeds this value, temp workers can be hired
 -define(fTMax, fTMax).        %% Maximum plant load Beyond this value, the factory will no longer accept tasks
 
-%% Í¬²½ÈÎÎñµÄµÈ´ıÊ±¼ä
+%% åŒæ­¥ä»»åŠ¡çš„ç­‰å¾…æ—¶é—´
 -define(WAIT_TIME, 5000).
 
 -type fawOtp() :: {?wMod, atom()} | {?wFCnt, pos_integer()} | {?wTCnt, pos_integer()} | {?fTLfl, pos_integer() | infinity} | {?fTMax, pos_integer() | infinity}.
